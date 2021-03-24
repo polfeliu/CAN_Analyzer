@@ -151,6 +151,21 @@ void StartDefaultTask(void const * argument)
 * @param argument: Not used
 * @retval None
 */
+
+
+typedef union CANserial_msg_u{
+	uint8_t bytes[19];
+
+	struct __attribute__ ((__packed__)) data_s{
+		uint8_t SOF;
+		uint32_t Timestamp;
+		uint8_t DLC;
+		uint32_t ID;
+		uint8_t END[9];
+	}data;
+}CANserial_msg;
+
+
 /* USER CODE END Header_socketTaskStart */
 void socketTaskStart(void const * argument)
 {
@@ -178,6 +193,7 @@ void socketTaskStart(void const * argument)
 		return;
 	  }
 
+
 	  /* listen for incoming connections (TCP listen backlog = 5) */
 	  listen(sock, 5);
 
@@ -191,20 +207,52 @@ void socketTaskStart(void const * argument)
 		newconn = accept(sock, (struct sockaddr* )&remotehost,
 				(socklen_t* )&size);
 
+
 		for (;;) {
 			osDelay(100);
 
 			HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
 
-			int buflen = 1500;
-			unsigned char recv_buffer[1500];
-			int ret = read(newconn, recv_buffer, sizeof(recv_buffer));
-			if (ret < 0) { //lost connection
-				break;
-			}
 
-			char data[] = "afsdadsffasdfsad";
-			write(newconn, (const unsigned char* )(data), sizeof(data));
+
+
+			char data[19] = {
+					0xAA,	0x66, 0x73, 0x00, 0x00,	0x01,	0x01, 0x00, 0x00, 0x00,	0x11, 0xBB,
+			};
+
+/*			//Create frame
+			data[0] = 0xAA;
+			// Start of frame
+			data[1] = 0;//Timestamp
+			data[2] = 0;//Timestamp
+			data[3] = 0;//Timestamp
+			data[4] = 0;//Timestamp
+
+			data[5] = 4; //DLC
+
+			data[6] = 1; //Arbitration ID 4
+			data[7] = 1; //Arbitration ID 3
+			data[8] = 1; //Arbitration ID 2
+			data[9] = 1; //Arbitration ID 1
+
+			data[10] = 0; //Payload
+			data[11] = 0;
+			data[12] = 0;
+			data[13] = 0;
+
+			data[14] = 0xBB; //End of frame
+*/
+
+			CANserial_msg msg;
+			msg.data.SOF = 0xAA;
+			msg.data.Timestamp = 123;
+			msg.data.DLC = 8;
+			msg.data.ID = 0x234;
+			msg.data.END[8] = 0xBB;
+
+			uint8_t len = 19;
+
+			write(newconn, (const unsigned char* )(msg.bytes), len);
 
 		}
 
