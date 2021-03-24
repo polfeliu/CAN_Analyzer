@@ -31,6 +31,8 @@
 #include "lwip/inet.h"
 #include "lwip/sockets.h"
 
+#include "can.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -210,17 +212,22 @@ void socketTaskStart(void const * argument)
 
 	/* Infinite loop */
 	for (;;) {
-		newconn = accept(sock, (struct sockaddr* )&remotehost,
-				(socklen_t* )&size);
+		HAL_CAN_Stop(&hcan1);
 
+		newconn = accept(sock, (struct sockaddr* )&remotehost,(socklen_t* )&size);
+
+		if(HAL_CAN_Start(&hcan1) != HAL_OK){
+			Error_Handler();
+		}
+
+		if(HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING|CAN_IT_TX_MAILBOX_EMPTY) != HAL_OK){
+			Error_Handler();
+		}
 
 		for (;;) {
-			osDelay(100);
-
 			HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
 
 			uint8_t payload[] = {0,1,2,3,4,5,6,7};
-			addMsg(8, 0x112, payload);
 
 			CANserial_msg msg;
 			xQueueReceive( txqueueHandle,&msg,portMAX_DELAY );
@@ -239,13 +246,13 @@ void socketTaskStart(void const * argument)
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
-void addMsg(uint8_t DLC, uint32_t ID, uint8_t data[]){
+void addMsg(uint8_t DLC, uint32_t ID, uint8_t data[]){ //must be called from ISR context
 	CANserial_msg msg;
 
 	msg.data.SOF = 0xAA;
 	msg.data.Timestamp = 0;
 	msg.data.DLC = DLC;
-	msg.data.ID = 0x234;
+	msg.data.ID = ID;
 
 	for(int i=0; i<DLC;i++){
 		msg.data.END[i] = data[i];
@@ -253,10 +260,39 @@ void addMsg(uint8_t DLC, uint32_t ID, uint8_t data[]){
 
 	msg.data.END[DLC] = 0xBB;
 
-	xQueueSend(txqueueHandle, &msg, 0);
+
+	if(txqueueHandle != NULL){
+		xQueueSendFromISR(txqueueHandle, &msg, 0);
+	}
 
 
 }
+
+void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef*hcan){
+	uint8_t data[8];
+	uint32_t ID;
+
+	CAN_RxHeaderTypeDef header;
+
+	HAL_CAN_GetRxMessage( // Get Message
+			&hcan1,
+			CAN_RX_FIFO0,
+			&header,
+			data
+		);
+
+	if (header.IDE == CAN_ID_EXT) {
+		ID = header.ExtId;
+	} else {
+		ID = header.StdId;
+	}
+
+
+	addMsg(header.DLC, ID, data);
+
+
+}
+
 /* USER CODE END Application */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

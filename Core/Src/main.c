@@ -3,6 +3,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
+#include "can.h"
 #include "lwip.h"
 #include "gpio.h"
 
@@ -62,7 +63,30 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_CAN1_Init();
   /* USER CODE BEGIN 2 */
+
+	CAN_FilterTypeDef sFilterConfig;
+
+	// Common Filter Parameters
+	sFilterConfig.FilterMode = CAN_FILTERMODE_IDMASK;
+	sFilterConfig.FilterScale = CAN_FILTERSCALE_32BIT;
+	sFilterConfig.FilterActivation = CAN_FILTER_ENABLE;
+	sFilterConfig.SlaveStartFilterBank = 14;
+	sFilterConfig.FilterFIFOAssignment = CAN_FILTER_FIFO0;
+
+	// Config Standard Filter
+  sFilterConfig.FilterBank = 0;
+  sFilterConfig.FilterIdHigh = 0;
+	sFilterConfig.FilterMaskIdHigh = 0;
+	sFilterConfig.FilterIdLow = 0;
+	sFilterConfig.FilterMaskIdLow = 0;
+
+	if(HAL_CAN_ConfigFilter(&hcan1, &sFilterConfig) != HAL_OK)
+	{
+		Error_Handler();
+	}
+
   /* USER CODE END 2 */
 
   /* Call init function for freertos objects (in freertos.c) */
@@ -101,7 +125,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLM = 8;
-  RCC_OscInitStruct.PLL.PLLN = 168;
+  RCC_OscInitStruct.PLL.PLLN = 160;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 4;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
