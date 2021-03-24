@@ -246,27 +246,6 @@ void socketTaskStart(void const * argument)
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
-void addMsg(uint8_t DLC, uint32_t ID, uint8_t data[]){ //must be called from ISR context
-	CANserial_msg msg;
-
-	msg.data.SOF = 0xAA;
-	msg.data.Timestamp = 0;
-	msg.data.DLC = DLC;
-	msg.data.ID = ID;
-
-	for(int i=0; i<DLC;i++){
-		msg.data.END[i] = data[i];
-	}
-
-	msg.data.END[DLC] = 0xBB;
-
-
-	if(txqueueHandle != NULL){
-		xQueueSendFromISR(txqueueHandle, &msg, 0);
-	}
-
-
-}
 
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef*hcan){
 	uint8_t data[8];
@@ -287,8 +266,24 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef*hcan){
 		ID = header.StdId;
 	}
 
+	CANserial_msg msg;
 
-	addMsg(header.DLC, ID, data);
+	msg.data.SOF = 0xAA;
+	msg.data.Timestamp = xTaskGetTickCountFromISR(); //tickrate 1 ms
+	msg.data.DLC = header.DLC;
+	msg.data.ID = ID;
+
+	for(int i=0; i<header.DLC;i++){
+		msg.data.END[i] = data[i];
+	}
+
+	msg.data.END[header.DLC] = 0xBB;
+
+
+	if(txqueueHandle != NULL){
+		xQueueSendFromISR(txqueueHandle, &msg, 0);
+	}
+
 
 
 }
