@@ -35,6 +35,18 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+typedef union CANserial_msg_u{
+	uint8_t bytes[19];
+
+	struct __attribute__ ((__packed__)) data_s{
+		uint8_t SOF;
+		uint32_t Timestamp;
+		uint8_t DLC;
+		uint32_t ID;
+		uint8_t END[9];
+	}data;
+}CANserial_msg;
+
 
 /* USER CODE END PTD */
 
@@ -54,6 +66,7 @@
 /* USER CODE END Variables */
 osThreadId defaultTaskHandle;
 osThreadId socketTaskHandle;
+osMessageQId txqueueHandle;
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -104,6 +117,11 @@ void MX_FREERTOS_Init(void) {
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
 
+  /* Create the queue(s) */
+  /* definition and creation of txqueue */
+  osMessageQDef(txqueue, 16, CANserial_msg);
+  txqueueHandle = osMessageCreate(osMessageQ(txqueue), NULL);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -153,18 +171,6 @@ void StartDefaultTask(void const * argument)
 */
 
 
-typedef union CANserial_msg_u{
-	uint8_t bytes[19];
-
-	struct __attribute__ ((__packed__)) data_s{
-		uint8_t SOF;
-		uint32_t Timestamp;
-		uint8_t DLC;
-		uint32_t ID;
-		uint8_t END[9];
-	}data;
-}CANserial_msg;
-
 
 /* USER CODE END Header_socketTaskStart */
 void socketTaskStart(void const * argument)
@@ -213,44 +219,14 @@ void socketTaskStart(void const * argument)
 
 			HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
 
-
-
-
-			char data[19] = {
-					0xAA,	0x66, 0x73, 0x00, 0x00,	0x01,	0x01, 0x00, 0x00, 0x00,	0x11, 0xBB,
-			};
-
-/*			//Create frame
-			data[0] = 0xAA;
-			// Start of frame
-			data[1] = 0;//Timestamp
-			data[2] = 0;//Timestamp
-			data[3] = 0;//Timestamp
-			data[4] = 0;//Timestamp
-
-			data[5] = 4; //DLC
-
-			data[6] = 1; //Arbitration ID 4
-			data[7] = 1; //Arbitration ID 3
-			data[8] = 1; //Arbitration ID 2
-			data[9] = 1; //Arbitration ID 1
-
-			data[10] = 0; //Payload
-			data[11] = 0;
-			data[12] = 0;
-			data[13] = 0;
-
-			data[14] = 0xBB; //End of frame
-*/
+			uint8_t payload[] = {0,1,2,3,4,5,6,7};
+			addMsg(8, 0x112, payload);
 
 			CANserial_msg msg;
-			msg.data.SOF = 0xAA;
-			msg.data.Timestamp = 123;
-			msg.data.DLC = 8;
-			msg.data.ID = 0x234;
-			msg.data.END[8] = 0xBB;
+			xQueueReceive( txqueueHandle,&msg,portMAX_DELAY );
 
-			uint8_t len = 19;
+			uint8_t len = 11 + msg.data.DLC;
+
 
 			write(newconn, (const unsigned char* )(msg.bytes), len);
 
@@ -258,12 +234,29 @@ void socketTaskStart(void const * argument)
 
 		//http_server_serve(newconn);
 	}
-	/* USER CODE END socketTaskStart */
+  /* USER CODE END socketTaskStart */
 }
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
+void addMsg(uint8_t DLC, uint32_t ID, uint8_t data[]){
+	CANserial_msg msg;
 
+	msg.data.SOF = 0xAA;
+	msg.data.Timestamp = 0;
+	msg.data.DLC = DLC;
+	msg.data.ID = 0x234;
+
+	for(int i=0; i<DLC;i++){
+		msg.data.END[i] = data[i];
+	}
+
+	msg.data.END[DLC] = 0xBB;
+
+	xQueueSend(txqueueHandle, &msg, 0);
+
+
+}
 /* USER CODE END Application */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

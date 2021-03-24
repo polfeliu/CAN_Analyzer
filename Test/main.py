@@ -30,7 +30,6 @@ with socket.socket(socket.AF_INET, socket.SOCK_RAW) as s:
 import can
 
 bus = can.interface.Bus(bustype='serial', channel='socket://192.168.1.34:1234')
-
 notifier = can.Notifier(bus, [can.Printer()])
 
 while True:
@@ -38,9 +37,9 @@ while True:
     print("message")
     pprint(msg)'''
     #print(msg.dlc, msg.data, msg.arbitration_id)
-    message = can.Message(arbitration_id=123, is_extended_id=False,
-                          data=[0x11, 0x22, 0x33])
-    bus.send(message, timeout=0.2)
+    #message = can.Message(arbitration_id=123, is_extended_id=False,
+    #                     data=[0x11, 0x22, 0x33])
+    #bus.send(message, timeout=0.2)
 
     time.sleep(0.1)
 
