@@ -26,6 +26,10 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "lwip/opt.h"
+#include "lwip/api.h"
+#include "lwip/inet.h"
+#include "lwip/sockets.h"
 
 /* USER CODE END Includes */
 
@@ -49,6 +53,7 @@
 
 /* USER CODE END Variables */
 osThreadId defaultTaskHandle;
+osThreadId socketTaskHandle;
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -56,6 +61,7 @@ osThreadId defaultTaskHandle;
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void const * argument);
+void socketTaskStart(void const * argument);
 
 extern void MX_LWIP_Init(void);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
@@ -107,6 +113,10 @@ void MX_FREERTOS_Init(void) {
   osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
+  /* definition and creation of socketTask */
+  osThreadDef(socketTask, socketTaskStart, osPriorityIdle, 0, 512);
+  socketTaskHandle = osThreadCreate(osThread(socketTask), NULL);
+
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
@@ -125,12 +135,70 @@ void StartDefaultTask(void const * argument)
   /* init code for LWIP */
   MX_LWIP_Init();
   /* USER CODE BEGIN StartDefaultTask */
+
   /* Infinite loop */
   for(;;)
   {
     osDelay(1);
+
   }
   /* USER CODE END StartDefaultTask */
+}
+
+/* USER CODE BEGIN Header_socketTaskStart */
+/**
+* @brief Function implementing the socketTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_socketTaskStart */
+void socketTaskStart(void const * argument)
+{
+  /* USER CODE BEGIN socketTaskStart */
+
+	int sock, newconn, size;
+	  struct sockaddr_in address, remotehost;
+
+	 /* create a TCP socket */
+	  if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+	  {
+		return;
+	  }
+
+	  /* bind to port at any interface */
+	  address.sin_family = AF_INET;
+	  address.sin_port = htons(1234);
+	  address.sin_addr.s_addr = INADDR_ANY;
+
+	  if (bind(sock, (struct sockaddr *)&address, sizeof (address)) < 0)
+	  {
+		return;
+	  }
+
+	  /* listen for incoming connections (TCP listen backlog = 5) */
+	  listen(sock, 5);
+
+	  size = sizeof(remotehost);
+	  //int buflen = 1500;
+	  //unsigned char recv_buffer[1500];
+	  //int ret = read(newconn, recv_buffer, sizeof(recv_buffer));
+
+	  newconn = accept(sock, (struct sockaddr *)&remotehost, (socklen_t *)&size);
+
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(100);
+
+    char data[] = "afsdadsffasdfsad";
+
+    HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+
+    write(newconn, (const unsigned char*)(data), sizeof(data));
+
+        //http_server_serve(newconn);
+  }
+  /* USER CODE END socketTaskStart */
 }
 
 /* Private application code --------------------------------------------------*/
