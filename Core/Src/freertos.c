@@ -156,6 +156,9 @@ void socketTaskStart(void const * argument)
 {
   /* USER CODE BEGIN socketTaskStart */
 
+	//Wait a second for the link to be init
+	vTaskDelay(1000);
+
 	int sock, newconn, size;
 	  struct sockaddr_in address, remotehost;
 
@@ -183,22 +186,31 @@ void socketTaskStart(void const * argument)
 	  //unsigned char recv_buffer[1500];
 	  //int ret = read(newconn, recv_buffer, sizeof(recv_buffer));
 
-	  newconn = accept(sock, (struct sockaddr *)&remotehost, (socklen_t *)&size);
+	/* Infinite loop */
+	for (;;) {
+		newconn = accept(sock, (struct sockaddr* )&remotehost,
+				(socklen_t* )&size);
 
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(100);
+		for (;;) {
+			osDelay(100);
 
-    char data[] = "afsdadsffasdfsad";
+			HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
 
-    HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+			int buflen = 1500;
+			unsigned char recv_buffer[1500];
+			int ret = read(newconn, recv_buffer, sizeof(recv_buffer));
+			if (ret < 0) { //lost connection
+				break;
+			}
 
-    write(newconn, (const unsigned char*)(data), sizeof(data));
+			char data[] = "afsdadsffasdfsad";
+			write(newconn, (const unsigned char* )(data), sizeof(data));
 
-        //http_server_serve(newconn);
-  }
-  /* USER CODE END socketTaskStart */
+		}
+
+		//http_server_serve(newconn);
+	}
+	/* USER CODE END socketTaskStart */
 }
 
 /* Private application code --------------------------------------------------*/
